@@ -91,4 +91,7 @@ def optimize_bayes(number_of_params,
                               X=p0,
                               ARD=True
                               )
-    return
+
+    bo.run_optimization(max_iter=max_iter)
+
+    return bo
