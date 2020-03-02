@@ -10,13 +10,22 @@ import moments
 from EvalLogger import EvalLogger
 
 
-def generate_random_value(low_bound, upp_bound):
+def generate_random_value(low_bound, upp_bound, identificator=None):
     """
     Generate random value for different parameters of models
 
+    :param low_bound: Lower bound on parameter values.
+    :param upp_bound: Upper bound on parameter values.
+    :param identificator: Define parameter as
+                            N - size of population, (in Nref units)
+                            m - migration rate, (in 1/Nref units)
+                            T - time,  (in Nref units)
+                            s - split ratio. (in 1 units)
+
     Using https://github.com/ctlab/GADMA/blob/master/gadma/demographic_model.py#L385
     """
-    if (low_bound == 0 and upp_bound == 1) \
+    if (identificator == 's') or \
+            (low_bound == 0 and upp_bound == 1) \
             or not (low_bound <= 1 <= upp_bound):
         return np.random.uniform(low_bound, upp_bound)
 
@@ -37,7 +46,11 @@ def generate_random_value(low_bound, upp_bound):
     u = np.log(upp_bound)
     m = np.log(m)
 
-    random_generator = lambda a, b, c: gadma.support.sample_from_truncated_normal(b, max(b - a, c - b) / 3, a, c)
+    if identificator == 't':
+        random_generator = np.random.triangular
+    else:
+        random_generator = lambda a, b, c: gadma.support.sample_from_truncated_normal(b, max(b - a, c - b) / 3, a, c)
+
     # generate sample
     sample = random_generator(l, m, u)
 
@@ -76,7 +89,7 @@ def check_to_stop(bo, iter_cnt, Y_eps):
 
 
 def optimize_bayes(data, model_func,
-                   lower_bound, upper_bound,
+                   lower_bound, upper_bound, p_ids=None,
                    log=True,
                    max_iter=100,
                    num_init_pts=5,
@@ -90,7 +103,13 @@ def optimize_bayes(data, model_func,
     :param model_func: Function to evaluate model spectrum.
     :param lower_bound: Lower bound on parameter values. If using log, must be positive.
     :param upper_bound: Upper bound on parameter values. If using log, must be positive.
-    :param log: If log = True, then model_func will be calculated for the logs of the parameters;
+    :param p_ids: List of special symbols, that define parameters as N, m, T or s.
+                    N - size of population, (in Nref units)
+                    m - migration rate, (in 1/Nref units)
+                    T - time,  (in Nref units)
+                    s - split ratio. (in 1 units)
+
+    :param log: If log = True, then model_func will be calculated for the logs of the parameters.
     :param max_iter: Maximum iterations to run for.
     :param num_init_pts: Number of initial points.
     :param kern_func_name: Name of the kernel that available at
@@ -111,8 +130,15 @@ def optimize_bayes(data, model_func,
     domain = np.array([{'name': 'var_' + str(i), 'type': 'continuous', 'domain': bd}
                        for i, bd in enumerate(zip(lower_bound, upper_bound))])
     kernel = op.attrgetter(kern_func_name)(GPy.kern.src.stationary)
+
+    if p_ids is not None:
+        p_ids = [x.lower()[0] for x in p_ids]
+    else:
+        p_ids = [None for _ in range(len(lower_bound))]
+
     p0 = np.array(
-        [[generate_random_value(low_bound, upp_bound) for (low_bound, upp_bound) in zip(lower_bound, upper_bound)]
+        [[generate_random_value(low_bound, upp_bound, p_id) for (low_bound, upp_bound, p_id)
+          in zip(lower_bound, upper_bound, p_ids)]
          for _ in range(num_init_pts)])
 
     if log:
