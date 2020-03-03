@@ -3,10 +3,10 @@ from functools import partial
 
 import GPy
 import gadma
+import moments
 import numpy as np
 from GPyOpt.methods import BayesianOptimization
 
-import moments
 from EvalLogger import EvalLogger
 
 
@@ -156,7 +156,7 @@ def optimize_bayes(data, model_func,
                               domain=domain,
                               model_type='GP',
                               acquisition_type='EI',
-                              kernel=kernel(input_dim=model_func.__code__.co_argcount),
+                              kernel=kernel(input_dim=len(p_ids)),
                               ARD=True,  # By default, in kernel there's only one lengthscale:
                               # separate lengthscales for each dimension can be enables by setting ARD=True
                               X=p0,
