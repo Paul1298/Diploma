@@ -115,7 +115,7 @@ def optimize_bayes(data, model_func,
     :param kern_func_name: Name of the kernel that available at
                            https://github.com/SheffieldML/GPy/blob/devel/GPy/kern/src/stationary.py
 
-                        You can see kernels using this code
+                        You can see kernel names using this code
                         ```
                         [m[0] for m in inspect.getmembers(GPy.kern.src.stationary, inspect.isclass)
                         if m[1].__module__ == 'GPy.kern.src.stationary']
