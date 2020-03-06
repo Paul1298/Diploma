@@ -93,7 +93,7 @@ def optimize_bayes(data, model_func,
                    log=True,
                    max_iter=100,
                    num_init_pts=5,
-                   kern_func_name=None,
+                   kern_func_name='Matern52',
                    output_log_file=None):
     """
     (using GA doc)
@@ -123,6 +123,8 @@ def optimize_bayes(data, model_func,
     :param output_log_file: Stream verbose log output into this filename. If None, no logging.
     :return:
     """
+    # TODO: check input params (maybe in GADMA)
+
     if output_log_file:
         eval_log: EvalLogger = EvalLogger(output_log_file, log)
 
