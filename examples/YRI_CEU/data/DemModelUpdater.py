@@ -1,9 +1,9 @@
-import importlib.util
+import importlib
 from inspect import getsourcelines
 
 
 class Updater:
-    def __init__(self, filename):
+    def __init__(self, filename: str):
         self.filename = filename
         self.model_func_name = 'model_func'
 
@@ -32,10 +32,8 @@ class Updater:
         self.__append_new_code(bound_type + '_bound', bound)
 
     def check_model(self):
-        # TODO: add try except import wrapper and разобраться с importlib
-        spec = importlib.util.spec_from_file_location('dem_model', self.filename)
-        self.dem_model = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(self.dem_model)
+        # TODO: add try except import wrapper
+        self.dem_model = importlib.import_module(self.filename.replace('/', '.').rstrip('.py'))
 
         if self.model_func_name not in dir(self.dem_model):
             # inspect.isfunction
@@ -45,8 +43,7 @@ class Updater:
         if 'p_ids' not in exist_attrs:
             self.__append_p_ids()
 
-            # чтобы если границ тоже нет, то подгрузить модуль с уже существующими p_ids
-            spec.loader.exec_module(self.dem_model)
+            importlib.reload(self.dem_model)
 
         if 'lower_bound' not in exist_attrs:
             self.__append_bounds('lower')
@@ -54,7 +51,8 @@ class Updater:
         if 'upper_bound' not in exist_attrs:
             self.__append_bounds('upper')
 
+        importlib.reload(self.dem_model)
 
 # if __name__ == '__main__':
-    # filename = 'data_example1/demographic_model.py'
-    # Updater(filename).check_model()
+# filename = 'data_example1/demographic_model.py'
+# Updater(filename).check_model()
