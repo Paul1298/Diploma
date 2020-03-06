@@ -7,10 +7,9 @@ class Updater:
         self.filename = filename
         self.model_func_name = 'model_func'
 
-    @staticmethod
-    def __append_new_code(name, context):
-        with open(filename, 'a') as f:
-            f.write(f'\n\n{name} = {context}\n')
+    def __append_new_code(self, var_name, var_context):
+        with open(self.filename, 'a') as f:
+            f.write(f'\n\n{var_name} = {var_context}\n')
 
     def __append_p_ids(self):
         # Основано на предположении о том, что параметры распаковываются в 1й строке
@@ -33,8 +32,8 @@ class Updater:
         self.__append_new_code(bound_type + '_bound', bound)
 
     def check_model(self):
-        # TODO: add try except import wrapper
-        spec = importlib.util.spec_from_file_location('dem_model', filename)
+        # TODO: add try except import wrapper and разобраться с importlib
+        spec = importlib.util.spec_from_file_location('dem_model', self.filename)
         self.dem_model = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.dem_model)
 
@@ -56,7 +55,6 @@ class Updater:
             self.__append_bounds('upper')
 
 
-if __name__ == '__main__':
-    # filename = input()
-    filename = 'demographic_model.py'
-    Updater(filename).check_model()
+# if __name__ == '__main__':
+    # filename = 'data_example1/demographic_model.py'
+    # Updater(filename).check_model()
