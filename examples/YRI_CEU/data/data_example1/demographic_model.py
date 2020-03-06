@@ -18,7 +18,6 @@ def model_func(params, ns):
 
     return fs
 
-
 p_ids = ['n', 'n', 'n', 'm', 'm', 'm', 't', 't']
 
 
