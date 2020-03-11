@@ -18,10 +18,9 @@ def model_func(params, ns):
 
     return fs
 
+
 p_ids = ['n', 'n', 'n', 'm', 'm', 'm', 't', 't']
 
-
 lower_bound = [0.01, 0.01, 0.01, 0, 0, 0, 0, 0]
-
 
 upper_bound = [100, 100, 100, 10, 10, 10, 5, 5]

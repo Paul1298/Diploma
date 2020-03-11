@@ -6,6 +6,7 @@ class Updater:
     def __init__(self, filename: str):
         self.filename = filename
         self.model_func_name = 'model_func'
+        self.dem_model = None  # init in check_model
 
     def __append_new_code(self, var_name, var_context):
         with open(self.filename, 'a') as f:
