@@ -1,11 +1,14 @@
 import importlib
+import multiprocessing as mp
 import os
+import sys
+import time
 
 import gadma
 import moments
 
 import Inference
-from examples.YRI_CEU.no_data.DemModelUpdater import Updater
+from DemModelUpdater import Updater
 
 SKIP_DIRS = ['__pycache__']
 
@@ -29,8 +32,14 @@ KNOWN_ALGORITHMS = {
 }
 
 
-# TODO: change default num_starts to 20
-def run(data_dir, num_cores=1, algorithms=None, output_log_dir='results', num_starts=2):
+def parallel_wrap(*args):
+    return run(*args[0][0])
+
+
+def run(data_dir, algorithms=None, num_cores=1, output_log_dir='results', num_starts=20):
+    if type(algorithms) is str:
+        algorithms = [algorithms]
+
     if algorithms is None:
         algorithms = []
 
@@ -48,8 +57,8 @@ def run(data_dir, num_cores=1, algorithms=None, output_log_dir='results', num_st
         try:
             data_fs_file, model_file = map(lambda x: os.path.join(dirpath, x), sorted(files))
         except ValueError:
-            print(dirpath)
-            break
+            print('Unsupported structure', file=sys.stderr)
+            continue
 
         Updater(model_file).check_model()
 
@@ -62,32 +71,40 @@ def run(data_dir, num_cores=1, algorithms=None, output_log_dir='results', num_st
         data = moments.Spectrum.from_file(data_fs_file)
 
         # TODO: do it only when is output_log_dir a subdirectory of data_dir
-        result_dir = os.path.join(dirpath, output_log_dir)
-        os.makedirs(result_dir, exist_ok=True)
+        result_dir = os.path.join(dirpath, output_log_dir, time.strftime('%m.%d %X'))
 
-        # TODO: parallel
         for i in range(num_starts):
-            # print(f'Start{i} for {algorithms} configuration')
+            print(f'Start{i} for {algorithms} configuration', file=sys.stderr)
             start_dir = os.path.join(result_dir, f'start{i}')
-            os.mkdir(start_dir)
 
             for algorithm in algorithms:
                 optim = KNOWN_ALGORITHMS.get(algorithm)
                 if optim is None:
-                    print("Unknown algorithm")
+                    print("Unknown algorithm", file=sys.stderr)
                     # raise Exception("Unknown algorithm")
                 else:
-                    # print(f'\tEvaluation for {optim} start')
+                    print(f'\tEvaluation for {algorithm} start', file=sys.stderr)
                     log_dir = os.path.join(start_dir, algorithm)
-                    os.mkdir(log_dir)
+                    os.makedirs(log_dir, exist_ok=True)
 
+                    t1 = time.time()
                     optim(data, dem_model.model_func,
                           dem_model.lower_bound, dem_model.upper_bound, dem_model.p_ids,
                           small_test_iter_num, small_num_init_pts,
                           os.path.join(log_dir, 'evaluations.log'))
-                # print(f'\tEvaluation for {optim} done')
-            # print(f'Finish{i} for {algorithms} configuration')
+                    t2 = time.time()
+                    print(f'\tEvaluation time: {t2 - t1}', file=sys.stderr)
+                print(f'\tEvaluation for {algorithm} done', file=sys.stderr)
+            print(f'Finish{i} for {algorithms} configuration', file=sys.stderr)
 
 
 if __name__ == '__main__':
-    run('data_example1', 1, ('bayes', 'gadma'))
+    data_dirs = list(filter(lambda x: not x.startswith('__'), next(os.walk('.'))[1]))
+    algos = ['bayes', 'gadma']
+
+    X = [[(d, a) for d in data_dirs] for a in algos]
+
+    pool = mp.Pool()
+    res = pool.map(parallel_wrap, X)
+    pool.close()
+    pool.join()
