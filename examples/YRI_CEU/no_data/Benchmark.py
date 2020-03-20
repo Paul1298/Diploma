@@ -19,11 +19,28 @@ KNOWN_ALGORITHMS = {
                              max_iter=iter_num,
                              num_init_pts=num_init_pts,
                              output_log_file=filename),
+
     'gadma': lambda data, func, lower_bound, upper_bound, p_ids, iter_num, num_init_pts, filename:
     gadma.Inference.optimize_ga(len(p_ids), data, func,
                                 lower_bound=lower_bound,
                                 upper_bound=upper_bound,
                                 p_ids=p_ids,
+                                optimization_name=None,
+                                maxeval=iter_num,
+                                num_init_pts=num_init_pts,
+                                output_log_file=filename),
+
+    'random_search': lambda data, func, lower_bound, upper_bound, p_ids, iter_num, num_init_pts, filename:
+    gadma.Inference.optimize_ga(len(p_ids), data, func,
+                                lower_bound=lower_bound,
+                                upper_bound=upper_bound,
+                                p_ids=p_ids,
+
+                                frac_of_old_models=0,
+                                frac_of_mutated_models=0,
+                                frac_of_crossed_models=0,
+                                # Единица минус все эти доли равно доле случайных и обнулив их
+                                # мы делаем 100% случайных моделей на каждом шаге, а это и есть случайный поиск
                                 optimization_name=None,
                                 maxeval=iter_num,
                                 num_init_pts=num_init_pts,
@@ -36,7 +53,7 @@ def parallel_wrap(args):
     return run(*args)
 
 
-def run(data_dir, algorithms=None, start_idx=0, num_cores=1, output_log_dir='results'):
+def run(data_dir, algorithms=None, start_idx=0, output_log_dir='results'):
     if type(algorithms) is str:
         algorithms = [algorithms]
 
@@ -72,7 +89,7 @@ def run(data_dir, algorithms=None, start_idx=0, num_cores=1, output_log_dir='res
         data = moments.Spectrum.from_file(data_fs_file)
 
         # TODO: do it only when is output_log_dir a subdirectory of data_dir
-        result_dir = os.path.join(dirpath, output_log_dir, time.strftime('%m.%d %X'))
+        result_dir = os.path.join(dirpath, output_log_dir, time.strftime('%m.%d[%X]'))
 
         print(f'Start{start_idx} for {algorithms} configuration', file=sys.stderr)
         start_dir = os.path.join(result_dir, f'start{start_idx}')
@@ -100,7 +117,7 @@ def run(data_dir, algorithms=None, start_idx=0, num_cores=1, output_log_dir='res
 
 if __name__ == '__main__':
     data_dirs = list(filter(lambda x: not x.startswith('__'), next(os.walk('.'))[1]))
-    algos = ['bayes', 'gadma']
+    algos = ['bayes', 'gadma', 'random_search']
     num_starts = 2
 
     X = [(d, a, i) for d in data_dirs for a in algos for i in range(num_starts)]
