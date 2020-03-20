@@ -24,7 +24,6 @@ KNOWN_ALGORITHMS = {
                                 lower_bound=lower_bound,
                                 upper_bound=upper_bound,
                                 p_ids=p_ids,
-                                size_of_generation_in_ga=10,  # TODO уточнить
                                 optimization_name=None,
                                 maxeval=iter_num,
                                 num_init_pts=num_init_pts,
@@ -32,11 +31,12 @@ KNOWN_ALGORITHMS = {
 }
 
 
-def parallel_wrap(*args):
-    return run(*args[0][0])
+def parallel_wrap(args):
+    print(args)
+    return run(*args)
 
 
-def run(data_dir, algorithms=None, num_cores=1, output_log_dir='results', num_starts=20):
+def run(data_dir, algorithms=None, start_idx=0, num_cores=1, output_log_dir='results'):
     if type(algorithms) is str:
         algorithms = [algorithms]
 
@@ -64,6 +64,7 @@ def run(data_dir, algorithms=None, num_cores=1, output_log_dir='results', num_st
 
         dem_model = importlib.import_module(model_file.replace(os.path.sep, '.').rstrip('.py'))
 
+        # TODO
         small_test_iter_num = 1
         small_num_init_pts = 5
 
@@ -73,37 +74,40 @@ def run(data_dir, algorithms=None, num_cores=1, output_log_dir='results', num_st
         # TODO: do it only when is output_log_dir a subdirectory of data_dir
         result_dir = os.path.join(dirpath, output_log_dir, time.strftime('%m.%d %X'))
 
-        for i in range(num_starts):
-            print(f'Start{i} for {algorithms} configuration', file=sys.stderr)
-            start_dir = os.path.join(result_dir, f'start{i}')
+        print(f'Start{start_idx} for {algorithms} configuration', file=sys.stderr)
+        start_dir = os.path.join(result_dir, f'start{start_idx}')
 
-            for algorithm in algorithms:
-                optim = KNOWN_ALGORITHMS.get(algorithm)
-                if optim is None:
-                    print("Unknown algorithm", file=sys.stderr)
-                    # raise Exception("Unknown algorithm")
-                else:
-                    print(f'\tEvaluation for {algorithm} start', file=sys.stderr)
-                    log_dir = os.path.join(start_dir, algorithm)
-                    os.makedirs(log_dir, exist_ok=True)
+        for algorithm in algorithms:
+            optim = KNOWN_ALGORITHMS.get(algorithm)
+            if optim is None:
+                print("Unknown algorithm", file=sys.stderr)
+                # raise Exception("Unknown algorithm")
+            else:
+                print(f'\tEvaluation for {algorithm} start', file=sys.stderr)
+                log_dir = os.path.join(start_dir, algorithm)
+                os.makedirs(log_dir, exist_ok=True)
 
-                    t1 = time.time()
-                    optim(data, dem_model.model_func,
-                          dem_model.lower_bound, dem_model.upper_bound, dem_model.p_ids,
-                          small_test_iter_num, small_num_init_pts,
-                          os.path.join(log_dir, 'evaluations.log'))
-                    t2 = time.time()
-                    print(f'\tEvaluation time: {t2 - t1}', file=sys.stderr)
-                print(f'\tEvaluation for {algorithm} done', file=sys.stderr)
-            print(f'Finish{i} for {algorithms} configuration', file=sys.stderr)
+                t1 = time.time()
+                optim(data, dem_model.model_func,
+                      dem_model.lower_bound, dem_model.upper_bound, dem_model.p_ids,
+                      small_test_iter_num, small_num_init_pts,
+                      os.path.join(log_dir, 'evaluations.log'))
+                t2 = time.time()
+                print(f'\tEvaluation time: {t2 - t1}', file=sys.stderr)
+            print(f'\tEvaluation for {algorithm} done', file=sys.stderr)
+        print(f'Finish{start_idx} for {algorithms} configuration', file=sys.stderr)
 
 
 if __name__ == '__main__':
     data_dirs = list(filter(lambda x: not x.startswith('__'), next(os.walk('.'))[1]))
     algos = ['bayes', 'gadma']
+    num_starts = 2
 
-    X = [[(d, a) for d in data_dirs] for a in algos]
+    X = [(d, a, i) for d in data_dirs for a in algos for i in range(num_starts)]
+    print(X)
 
+    num_processes = 16
+    # pool = mp.Pool(num_processes)
     pool = mp.Pool()
     res = pool.map(parallel_wrap, X)
     pool.close()
