@@ -161,9 +161,9 @@ def optimize_bayes(data, model_func,
                               kernel=kernel(input_dim=len(p_ids), ARD=True),
                               # By default, in kernel there's only one lengthscale:
                               # separate lengthscales for each dimension can be enables by setting ARD=True
-                              X=p0,
+                              X=p0
                               )
 
-    bo.run_optimization(max_iter=max_iter)
+    bo.run_optimization(max_iter=max_iter, verbosity=True)
 
     return bo

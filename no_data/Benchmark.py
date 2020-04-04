@@ -1,8 +1,8 @@
 import importlib
 import multiprocessing as mp
 import os
-import sys
 import time
+from functools import partial
 
 import gadma
 import moments
@@ -48,84 +48,98 @@ KNOWN_ALGORITHMS = {
 }
 
 
-def parallel_wrap(args):
-    print(args)
-    return run(*args)
+def parallel_wrap(fun, args):
+    return fun(*args)
 
 
-def run(data_dir, algorithms=None, start_idx=0, output_log_dir='results'):
-    if type(algorithms) is str:
-        algorithms = [algorithms]
+def log_print(bench_log_path, context):
+    with open(bench_log_path, 'a') as log_file:
+        print(time.strftime('[%X]') + context, file=log_file)
 
-    if algorithms is None:
-        algorithms = []
 
+def run(data_dir, algorithm=None, start_idx=0, start_time=None, output_log_dir='results'):
     for dirpath, _, files in os.walk(data_dir):
         if any(x in dirpath for x in SKIP_DIRS + [output_log_dir]):
             continue
 
+        result_dir = os.path.join(dirpath, output_log_dir, start_time)
+        os.makedirs(result_dir, exist_ok=True)
+
+        bench_log_path = os.path.join(result_dir, 'bench.log')
+        cur_log_print = partial(log_print, bench_log_path)
         """
         Предполагаем, что данные хранятся так:
         
         data_dir_name
-            -'no_data.fs'
+            -'data.fs'
             -'demographic_model.py'
+            -'simulate_with_moments.py'
         """
         try:
-            data_fs_file, model_file = map(lambda x: os.path.join(dirpath, x), sorted(files))
+            data_fs_file, model_file, _ = map(lambda x: os.path.join(dirpath, x), sorted(files))
         except ValueError:
-            print('Unsupported structure', file=sys.stderr)
+            cur_log_print('Unsupported structure')
             continue
-
-        Updater(model_file).check_model()
 
         dem_model = importlib.import_module(model_file.replace(os.path.sep, '.').rstrip('.py'))
 
         # TODO
-        small_test_iter_num = 1
-        small_num_init_pts = 5
+        small_test_iter_num = 10
+        small_num_init_pts = 8
 
         # Load the no_data
         data = moments.Spectrum.from_file(data_fs_file)
 
         # TODO: do it only when is output_log_dir a subdirectory of data_dir
-        result_dir = os.path.join(dirpath, output_log_dir, time.strftime('%m.%d[%X]'))
 
-        print(f'Start{start_idx} for {algorithms} configuration', file=sys.stderr)
-        start_dir = os.path.join(result_dir, f'start{start_idx}')
+        cur_log_print(f'Start{start_idx} for {algorithm} configuration')
 
-        for algorithm in algorithms:
-            optim = KNOWN_ALGORITHMS.get(algorithm)
-            if optim is None:
-                print("Unknown algorithm", file=sys.stderr)
-                # raise Exception("Unknown algorithm")
-            else:
-                print(f'\tEvaluation for {algorithm} start', file=sys.stderr)
-                log_dir = os.path.join(start_dir, algorithm)
-                os.makedirs(log_dir, exist_ok=True)
+        optim = KNOWN_ALGORITHMS.get(algorithm)
+        if optim is None:
+            cur_log_print("Unknown algorithm")
+        else:
+            cur_log_print(f'\tEvaluation for {algorithm} start')
 
-                t1 = time.time()
-                optim(data, dem_model.model_func,
-                      dem_model.lower_bound, dem_model.upper_bound, dem_model.p_ids,
-                      small_test_iter_num, small_num_init_pts,
-                      os.path.join(log_dir, 'evaluations.log'))
-                t2 = time.time()
-                print(f'\tEvaluation time: {t2 - t1}', file=sys.stderr)
-            print(f'\tEvaluation for {algorithm} done', file=sys.stderr)
-        print(f'Finish{start_idx} for {algorithms} configuration', file=sys.stderr)
+            algorithm_dir = os.path.join(result_dir, algorithm)
+            log_dir = os.path.join(algorithm_dir, f'start{start_idx}')
+            os.makedirs(log_dir, exist_ok=True)
+
+            t1 = time.time()
+            optim(data, dem_model.model_func,
+                  dem_model.lower_bound, dem_model.upper_bound, dem_model.p_ids,
+                  small_test_iter_num, small_num_init_pts,
+                  os.path.join(log_dir, 'evaluations.log'))
+            t2 = time.time()
+            cur_log_print(f'\tEvaluation time: {t2 - t1}')
+        cur_log_print(f'Finish{start_idx} for {algorithm} configuration')
+
+
+def pre_run(data_dir, output_log_dir='results'):
+    for dirpath, _, files in os.walk(data_dir):
+        if any(x in dirpath for x in SKIP_DIRS + [output_log_dir]):
+            continue
+
+        data_fs_file, model_file, sim_file = map(lambda x: os.path.join(dirpath, x), sorted(files))
+
+        Updater(model_file).check_model(sim_file)
 
 
 if __name__ == '__main__':
-    data_dirs = list(filter(lambda x: not x.startswith('__'), next(os.walk('.'))[1]))
+    data_dirs = list(filter(lambda x: x.startswith('data'), next(os.walk('.'))[1]))
     algos = ['bayes', 'gadma', 'random_search']
     num_starts = 2
 
-    X = [(d, a, i) for d in data_dirs for a in algos for i in range(num_starts)]
-    print(X)
+    start_time = time.strftime('%m.%d[%X]')
+    X = [(d, a, i, start_time) for d in data_dirs for a in algos for i in range(num_starts)]
+    # print(X)
 
-    num_processes = 16
-    # pool = mp.Pool(num_processes)
-    pool = mp.Pool()
-    res = pool.map(parallel_wrap, X)
+    num_processes = 4
+    pool = mp.Pool(num_processes)
+    # pool = mp.Pool()
+
+    pool.map(partial(parallel_wrap, pre_run), [(d,) for d in data_dirs])
+    pool.map(partial(parallel_wrap, run), X)
     pool.close()
     pool.join()
+
+    # pool.terminate()
