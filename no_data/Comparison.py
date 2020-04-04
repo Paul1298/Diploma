@@ -1,9 +1,7 @@
+import importlib
 import os
 
 import matplotlib.pyplot as plt
-import numpy as np
-
-data_dirs = list(filter(lambda x: x.startswith('data'), next(os.walk('.'))[1]))
 
 color_map = {
     'bayes': 'r',
@@ -11,6 +9,10 @@ color_map = {
     'random_search': 'b',
 }
 
+
+def get_max_ll(model_file):
+    dem_model = importlib.import_module(model_file.replace('/', '.').rstrip('.py'))
+    return dem_model.__getattribute__('max_ll')
 
 
 def draw(data_dir):
@@ -20,6 +22,9 @@ def draw(data_dir):
 
     fig, ax = plt.subplots(figsize=(21, 12))
     fig.suptitle('Comparison')
+
+    max_ll = get_max_ll(os.path.join(data_dir, 'demographic_model.py'))
+    plt.axhline(max_ll, color='r', linestyle='--', label='max_ll')
 
     color_num = 0
     max_iter_num = 0
@@ -85,4 +90,6 @@ def draw(data_dir):
     plt.savefig(os.path.join(last_start_dir, 'Comparison'))
 
 
-draw(data_dirs[0])
+if __name__ == '__main__':
+    data_dirs = list(filter(lambda x: x.startswith('data'), next(os.walk('.'))[1]))
+    [draw(d_d) for d_d in data_dirs]
