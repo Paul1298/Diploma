@@ -92,7 +92,7 @@ def run(data_dir, algorithm=None, start_idx=0, start_time=None, output_log_dir='
 
         # TODO: do it only when is output_log_dir a subdirectory of data_dir
 
-        cur_log_print(f'Start{start_idx} for {algorithm} configuration')
+        cur_log_print(f'Start{start_idx} for {algorithm} algorithm')
 
         optim = KNOWN_ALGORITHMS.get(algorithm)
         if optim is None:
@@ -110,8 +110,8 @@ def run(data_dir, algorithm=None, start_idx=0, start_time=None, output_log_dir='
                   small_test_iter_num, small_num_init_pts,
                   os.path.join(log_dir, 'evaluations.log'))
             t2 = time.time()
-            cur_log_print(f'\tEvaluation time: {t2 - t1}')
-        cur_log_print(f'Finish{start_idx} for {algorithm} configuration')
+            cur_log_print(f'\tEvaluation time: {t2 - t1} ({start_idx} for {algorithm})')
+        cur_log_print(f'Finish{start_idx} for {algorithm} algorithm')
 
 
 def pre_run(data_dir, output_log_dir='results'):
