@@ -32,7 +32,7 @@ class Updater:
         bound = [self.DEFAULT_BDS[p][bound_type == 'upper'] for p in self.dem_model.p_ids]
         self.__append_new_code(bound_type + '_bound', bound)
 
-    def check_model(self):
+    def check_model(self, sim_file):
         # TODO: add try except import wrapper
         self.dem_model = importlib.import_module(self.filename.replace('/', '.').rstrip('.py'))
 
@@ -44,13 +44,17 @@ class Updater:
         if 'p_ids' not in exist_attrs:
             self.__append_p_ids()
 
-            importlib.reload(self.dem_model)
+        importlib.reload(self.dem_model)
 
         if 'lower_bound' not in exist_attrs:
             self.__append_bounds('lower')
 
         if 'upper_bound' not in exist_attrs:
             self.__append_bounds('upper')
+
+        if 'max_ll' not in exist_attrs:
+            sim_mod = importlib.import_module(sim_file.replace('/', '.').rstrip('.py'))
+            self.__append_new_code('max_ll', sim_mod.__getattribute__('ll_model'))
 
         importlib.reload(self.dem_model)
 
