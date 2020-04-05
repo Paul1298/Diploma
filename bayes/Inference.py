@@ -24,6 +24,8 @@ def generate_random_value(low_bound, upp_bound, identificator=None):
 
     Using https://github.com/ctlab/GADMA/blob/master/gadma/demographic_model.py#L385
     """
+    np.random.seed()
+
     if (identificator == 's') or \
             (low_bound == 0 and upp_bound == 1) \
             or not (low_bound <= 1 <= upp_bound):
@@ -154,6 +156,7 @@ def optimize_bayes(data, model_func,
     obj_func = partial(objective_func, model_func, data, ns, log)
     if output_log_file:
         obj_func = partial(eval_log.log_wrapped, obj_func)
+
     bo = BayesianOptimization(f=obj_func,
                               domain=domain,
                               model_type='GP',

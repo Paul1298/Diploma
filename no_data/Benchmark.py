@@ -98,8 +98,6 @@ def run(data_dir, algorithm=None, start_idx=0, start_time=None, output_log_dir='
         if optim is None:
             cur_log_print("Unknown algorithm")
         else:
-            cur_log_print(f'\tEvaluation for {algorithm} start')
-
             algorithm_dir = os.path.join(result_dir, algorithm)
             log_dir = os.path.join(algorithm_dir, f'start{start_idx}')
             os.makedirs(log_dir, exist_ok=True)
@@ -127,7 +125,8 @@ def pre_run(data_dir, output_log_dir='results'):
 if __name__ == '__main__':
     data_dirs = list(filter(lambda x: x.startswith('data'), next(os.walk('.'))[1]))
     algos = ['bayes', 'gadma', 'random_search']
-    num_starts = 2
+
+    num_starts = 4
 
     start_time = time.strftime('%m.%d[%X]')
     X = [(d, a, i, start_time) for d in data_dirs for a in algos for i in range(num_starts)]
