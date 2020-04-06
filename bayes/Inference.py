@@ -26,7 +26,7 @@ def generate_random_value(low_bound, upp_bound, identificator=None):
     """
     np.random.seed()
 
-    if (identificator == 's') or \
+    if (identificator.lower() != 'n') or \
             (low_bound == 0 and upp_bound == 1) \
             or not (low_bound <= 1 <= upp_bound):
         return np.random.uniform(low_bound, upp_bound)
@@ -48,8 +48,9 @@ def generate_random_value(low_bound, upp_bound, identificator=None):
     u = np.log(upp_bound)
     m = np.log(m)
 
-    if identificator == 't':
-        random_generator = np.random.triangular
+    if identificator.lower() == 't':  # Now not working it is uniform in first line
+        # random_generator = np.random.triangular
+        random_generator = lambda a, b, c: gadma.support.sample_from_truncated_normal(b, max(b - a, c - b) / 20, a, c)
     else:
         random_generator = lambda a, b, c: gadma.support.sample_from_truncated_normal(b, max(b - a, c - b) / 3, a, c)
 
