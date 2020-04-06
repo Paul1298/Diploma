@@ -1,8 +1,10 @@
 import importlib
 import multiprocessing as mp
 import os
+import sys
 import time
 from functools import partial
+from shutil import copy
 
 import gadma
 import moments
@@ -63,7 +65,6 @@ def run(data_dir, algorithm=None, start_idx=0, start_time=None, output_log_dir='
             continue
 
         result_dir = os.path.join(dirpath, output_log_dir, start_time)
-        os.makedirs(result_dir, exist_ok=True)
 
         bench_log_path = os.path.join(result_dir, 'bench.log')
         cur_log_print = partial(log_print, bench_log_path)
@@ -84,7 +85,7 @@ def run(data_dir, algorithm=None, start_idx=0, start_time=None, output_log_dir='
         dem_model = importlib.import_module(model_file.replace(os.path.sep, '.').rstrip('.py'))
 
         # TODO
-        small_test_iter_num = 10
+        small_test_iter_num = 32
         small_num_init_pts = 8
 
         # Load the no_data
@@ -92,7 +93,7 @@ def run(data_dir, algorithm=None, start_idx=0, start_time=None, output_log_dir='
 
         # TODO: do it only when is output_log_dir a subdirectory of data_dir
 
-        cur_log_print(f'Start{start_idx} for {algorithm} algorithm')
+        cur_log_print(f'Start {start_idx} for {algorithm} algorithm')
 
         optim = KNOWN_ALGORITHMS.get(algorithm)
         if optim is None:
@@ -119,26 +120,29 @@ def pre_run(data_dir, output_log_dir='results'):
 
         data_fs_file, model_file, sim_file = map(lambda x: os.path.join(dirpath, x), sorted(files))
 
+        # save version of code, which it was launched
+        result_dir = os.path.join(dirpath, output_log_dir, start_time)
+        os.makedirs(result_dir, exist_ok=True)
+        copy('Benchmark.py', os.path.join(result_dir, 'CurrentVersionBenchmark.py'))
+
+        sys.path.insert(0, dirpath)
         Updater(model_file).check_model(sim_file)
 
 
 if __name__ == '__main__':
-    data_dirs = list(filter(lambda x: x.startswith('data'), next(os.walk('.'))[1]))
+    # data_dirs = list(filter(lambda x: x.startswith('data'), next(os.walk('.'))[1]))
+    data_dirs = ['data_2_DivMigr']
     algos = ['bayes', 'gadma', 'random_search']
 
-    num_starts = 4
+    num_starts = 1
 
     start_time = time.strftime('%m.%d[%X]')
     X = [(d, a, i, start_time) for d in data_dirs for a in algos for i in range(num_starts)]
-    # print(X)
 
-    num_processes = 4
+    num_processes = 6
     pool = mp.Pool(num_processes)
-    # pool = mp.Pool()
 
     pool.map(partial(parallel_wrap, pre_run), [(d,) for d in data_dirs])
-    pool.map(partial(parallel_wrap, run), X)
+    # pool.map(partial(parallel_wrap, run), X)
     pool.close()
     pool.join()
-
-    # pool.terminate()
