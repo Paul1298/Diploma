@@ -14,11 +14,11 @@ data = func(popt, [20, 20, 20]) * theta
 model = func(p0, [20, 20, 20])
 ll_model = moments.Inference.ll_multinom(model, data)
 print(('Maximum log composite likelihood: {0}'.format(ll_model)))
-print(moments.Inference.ll_multinom(data, data))
-theta = moments.Inference.optimal_sfs_scaling(model, data)
-theta /= 2
-print(('N_A:' + str(theta)))
-import numpy as np
-print(np.array(p0) * theta)
-print(np.array(p0) / theta)
+# print(moments.Inference.ll_multinom(data, data))
+# theta = moments.Inference.optimal_sfs_scaling(model, data)
+# theta /= 2
+# print(('N_A:' + str(theta)))
+# import numpy as np
+# print(np.array(p0) * theta)
+# print(np.array(p0) / theta)
 #model.to_file('simulated_data/00.fs')

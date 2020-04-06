@@ -23,8 +23,9 @@ def draw(data_dir):
     results_dir = os.path.join(data_dir, 'results')
     last_start_dir = os.path.join(results_dir,
                                   sorted(os.listdir(results_dir))[-1])
+    # last_start_dir = os.path.join(results_dir, '')
 
-    fig, ax = plt.subplots(figsize=(16, 9))
+    fig, ax = plt.subplots(figsize=(19.2, 10.8))
     fig.suptitle(data_dir)
 
     max_possible_ll = get_max_ll(os.path.join(data_dir, 'demographic_model.py'))
@@ -81,13 +82,15 @@ def draw(data_dir):
                         cur_max_iter_num = max(cur_max_iter_num, iter_num + 1)
                         avg_iter_num = (avg_iter_num[0] + iter_num + 1, avg_iter_num[1] + 1)
 
-        lls = np.array(lls)
+        # print(list(zip(lls)))
+        lls = np.array([*zip(*lls)]).T
 
         # ll_mean = [(sm / cnt) for (sm, cnt) in ll_mean]
         ll_mean = lls.mean(axis=0)
 
         # TODO: repeat(or special values) last iters if iter_num is different
-        iters = list(range(cur_max_iter_num))
+        # iters = list(range(cur_max_iter_num))
+        iters = list(range(lls.shape[1]))
 
         col = color_map[algo_dir]
 
@@ -95,29 +98,34 @@ def draw(data_dir):
         label_names.append(f'{algo_dir}: {avg_iter_num[0] / avg_iter_num[1]} avg iters')
 
         # confidence interval
-        ci = 1.96 * np.std(lls, axis=0) / ll_mean
+        ci = 1.96 * np.std(lls, axis=0) / np.sqrt(lls.shape[0])
+
         plt.fill_between(iters, (ll_mean - ci), (ll_mean + ci), alpha=0.4, color=col)
 
-        # plt.fill_between(iters, ll_min, ll_max, alpha=0.4, color=col)
+        # ll_min = lls.min(axis=0)
+        # ll_max = lls.max(axis=0)
+        # plt.fill_between(iters, ll_min, ll_max, alpha=0.1, color=col)
 
         max_iter_num = max(max_iter_num, cur_max_iter_num)
 
-    #     ax.yaxis.set_major_formatter(major_formatter)
-    #     plt.yscale('log')
+    plt.yscale('symlog')
 
     # iters = list(range(max_iter_num))
     # plt.xticks(iters)
 
-    plt.yticks(list(filter(lambda x: x < max_possible_ll, plt.yticks()[0])) + [max_possible_ll])
+    plt.yticks(list(filter(lambda x: x < max_possible_ll, plt.yticks()[0])) + [int(max_possible_ll)])
+    # print(plt.yticks())
+    # plt.yticks(plt.yticks()[0], plt.yticks()[1][:-1] + [f'~ {int(max_possible_ll)}'])
 
     plt.xlabel('Iteration')
     plt.ylabel('LogLL')
 
     plt.legend(plot_lines, label_names)
 
-    plt.savefig(os.path.join(last_start_dir, 'Comparison2'))
+    plt.savefig(os.path.join(last_start_dir, 'Iteration'))
 
 
 if __name__ == '__main__':
-    data_dirs = list(filter(lambda x: x.startswith('data'), next(os.walk('.'))[1]))
+    # data_dirs = list(filter(lambda x: x.startswith('data'), next(os.walk('.'))[1]))
+    data_dirs = ['data_2_DivMigr']
     [draw(d_d) for d_d in data_dirs]
