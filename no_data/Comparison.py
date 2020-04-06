@@ -2,6 +2,7 @@ import importlib
 import os
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 color_map = {
     'bayes': 'r',
@@ -12,7 +13,7 @@ color_map = {
 
 def get_max_ll(model_file):
     dem_model = importlib.import_module(model_file.replace('/', '.').rstrip('.py'))
-    return dem_model.__getattribute__('max_ll')
+    return dem_model.__getattribute__('max_possible_ll')
 
 
 def draw(data_dir):
@@ -23,13 +24,14 @@ def draw(data_dir):
     last_start_dir = os.path.join(results_dir,
                                   sorted(os.listdir(results_dir))[-1])
 
-    fig, ax = plt.subplots(figsize=(21, 12))
+    fig, ax = plt.subplots(figsize=(16, 9))
     fig.suptitle(data_dir)
 
-    max_ll = get_max_ll(os.path.join(data_dir, 'demographic_model.py'))
-    max_line = plt.axhline(max_ll, color='r', linestyle='--')
+    max_possible_ll = get_max_ll(os.path.join(data_dir, 'demographic_model.py'))
+
+    max_line = plt.axhline(max_possible_ll, color='r', linestyle='--', linewidth=1)
     plot_lines = [max_line]
-    label_names = ['max_ll']
+    label_names = ['max_possible_ll']
 
     max_iter_num = 0
 
@@ -37,9 +39,9 @@ def draw(data_dir):
 
     for algo_dir in dirnames:
         lls = []
-        ll_min = []
-        ll_max = []
-        ll_mean = []
+        # ll_min = []
+        # ll_max = []
+        # ll_mean = []
         iter_num = 0
         cur_max_iter_num = 0
         avg_iter_num = (0, 0)
@@ -57,55 +59,63 @@ def draw(data_dir):
                             parts = line.strip().split('\t')
 
                             logLL = -float(parts[1])
-                            max_ll = max(logLL, cur_lls[-1]) if cur_lls else logLL
-                            cur_lls.append(max_ll)
+                            cur_max_ll = max(logLL, cur_lls[-1]) if cur_lls else logLL
+                            cur_lls.append(cur_max_ll)
 
-                            if iter_num < len(ll_min):
-                                ll_min[iter_num] = min(ll_min[iter_num], max_ll)
-                            else:
-                                ll_min.append(max_ll)
-
-                            if iter_num < len(ll_max):
-                                ll_max[iter_num] = max(ll_max[iter_num], max_ll)
-                            else:
-                                ll_max.append(max_ll)
-
-                            if iter_num < len(ll_mean):
-                                ll_mean[iter_num] = (ll_mean[iter_num][0] + max_ll, ll_mean[iter_num][1] + 1)
-                            else:
-                                ll_mean.append((max_ll, 1))
+                            # if iter_num < len(ll_min):
+                            #     ll_min[iter_num] = min(ll_min[iter_num], cur_max_ll)
+                            # else:
+                            #     ll_min.append(cur_max_ll)
+                            #
+                            # if iter_num < len(ll_max):
+                            #     ll_max[iter_num] = max(ll_max[iter_num], cur_max_ll)
+                            # else:
+                            #     ll_max.append(cur_max_ll)
+                            #
+                            # if iter_num < len(ll_mean):
+                            #     ll_mean[iter_num] = (ll_mean[iter_num][0] + cur_max_ll, ll_mean[iter_num][1] + 1)
+                            # else:
+                            #     ll_mean.append((cur_max_ll, 1))
 
                         lls.append(cur_lls)
-                        cur_max_iter_num = max(cur_max_iter_num, iter_num)
+                        cur_max_iter_num = max(cur_max_iter_num, iter_num + 1)
                         avg_iter_num = (avg_iter_num[0] + iter_num + 1, avg_iter_num[1] + 1)
 
-        ll_mean = [(sm / cnt) for (sm, cnt) in ll_mean]
+        lls = np.array(lls)
+
+        # ll_mean = [(sm / cnt) for (sm, cnt) in ll_mean]
+        ll_mean = lls.mean(axis=0)
 
         # TODO: repeat(or special values) last iters if iter_num is different
+        iters = list(range(cur_max_iter_num))
 
-        iters = list(range(cur_max_iter_num + 1))
         col = color_map[algo_dir]
-        #         print()
 
         plot_lines.append(plt.plot(iters, ll_mean, color=col)[0])
         label_names.append(f'{algo_dir}: {avg_iter_num[0] / avg_iter_num[1]} avg iters')
 
-        plt.fill_between(iters, ll_min, ll_max, alpha=0.4, color=col)
+        # confidence interval
+        ci = 1.96 * np.std(lls, axis=0) / ll_mean
+        plt.fill_between(iters, (ll_mean - ci), (ll_mean + ci), alpha=0.4, color=col)
+
+        # plt.fill_between(iters, ll_min, ll_max, alpha=0.4, color=col)
 
         max_iter_num = max(max_iter_num, cur_max_iter_num)
 
     #     ax.yaxis.set_major_formatter(major_formatter)
     #     plt.yscale('log')
 
-    iters = list(range(max_iter_num))
-    plt.xticks(iters)
+    # iters = list(range(max_iter_num))
+    # plt.xticks(iters)
+
+    plt.yticks(list(filter(lambda x: x < max_possible_ll, plt.yticks()[0])) + [max_possible_ll])
 
     plt.xlabel('Iteration')
     plt.ylabel('LogLL')
 
     plt.legend(plot_lines, label_names)
 
-    plt.savefig(os.path.join(last_start_dir, 'Comparison'))
+    plt.savefig(os.path.join(last_start_dir, 'Comparison2'))
 
 
 if __name__ == '__main__':

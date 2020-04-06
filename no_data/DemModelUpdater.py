@@ -52,9 +52,9 @@ class Updater:
         if 'upper_bound' not in exist_attrs:
             self.__append_bounds('upper')
 
-        if 'max_ll' not in exist_attrs:
+        if 'max_possible_ll' not in exist_attrs:
             sim_mod = importlib.import_module(sim_file.replace('/', '.').rstrip('.py'))
-            self.__append_new_code('max_ll', sim_mod.__getattribute__('ll_model'))
+            self.__append_new_code('max_possible_ll', sim_mod.__getattribute__('ll_model'))
 
         importlib.reload(self.dem_model)
 
