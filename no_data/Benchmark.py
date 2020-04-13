@@ -15,12 +15,15 @@ from DemModelUpdater import Updater
 SKIP_DIRS = ['__pycache__']
 
 KNOWN_ALGORITHMS = {
-    'bayes': lambda data, func, lower_bound, upper_bound, p_ids, iter_num, num_init_pts, filename:
+    'my_bayes': lambda *args, **kwargs: KNOWN_ALGORITHMS['bayes'](*args, **kwargs, my=True),
+
+    'bayes': lambda data, func, lower_bound, upper_bound, p_ids, iter_num, num_init_pts, filename, my=False:
     Inference.optimize_bayes(data, func,
                              lower_bound, upper_bound, p_ids,
                              max_iter=iter_num,
                              num_init_pts=num_init_pts,
-                             output_log_file=filename),
+                             output_log_file=filename,
+                             my=my),
 
     'gadma': lambda data, func, lower_bound, upper_bound, p_ids, iter_num, num_init_pts, filename:
     gadma.Inference.optimize_ga(len(p_ids), data, func,
@@ -86,7 +89,7 @@ def run(data_dir, algorithm=None, start_idx=0, start_time=None, output_log_dir='
 
         # TODO
         small_test_iter_num = 32
-        small_num_init_pts = 8
+        small_num_init_pts = 16
 
         # Load the no_data
         data = moments.Spectrum.from_file(data_fs_file)
@@ -110,10 +113,10 @@ def run(data_dir, algorithm=None, start_idx=0, start_time=None, output_log_dir='
                   os.path.join(log_dir, 'evaluations.log'))
             t2 = time.time()
             cur_log_print(f'\tEvaluation time: {t2 - t1} ({start_idx} for {algorithm})')
-        cur_log_print(f'Finish{start_idx} for {algorithm} algorithm')
+        cur_log_print(f'Finish {start_idx} for {algorithm} algorithm')
 
 
-def pre_run(data_dir, output_log_dir='results'):
+def pre_run(data_dir, start_time, output_log_dir='results'):
     for dirpath, _, files in os.walk(data_dir):
         if any(x in dirpath for x in SKIP_DIRS + [output_log_dir]):
             continue
@@ -130,19 +133,24 @@ def pre_run(data_dir, output_log_dir='results'):
 
 
 if __name__ == '__main__':
-    # data_dirs = list(filter(lambda x: x.startswith('data'), next(os.walk('.'))[1]))
-    data_dirs = ['data_2_DivMigr']
-    algos = ['bayes', 'gadma', 'random_search']
-
-    num_starts = 1
-
     start_time = time.strftime('%m.%d[%X]')
+    # pre_run('data_4_DivMig', start_time)
+    # run('data_4_DivMig', 'bayes', 0, start_time)
+    # data_dirs = list(filter(lambda x: x.startswith('data'), next(os.walk('.'))[1]))
+    # data_dirs = ['data_2_DivMigr']
+    data_dirs = ['data_4_DivMig']
+    [pre_run(d, start_time) for d in data_dirs]
+
+    # algos = ['bayes', 'gadma', 'random_search']
+    algos = ['my_bayes', 'bayes']
+    # algos = ['my_bayes']
+
+    num_starts = 4
+
     X = [(d, a, i, start_time) for d in data_dirs for a in algos for i in range(num_starts)]
 
     num_processes = 6
     pool = mp.Pool(num_processes)
-
-    pool.map(partial(parallel_wrap, pre_run), [(d,) for d in data_dirs])
-    # pool.map(partial(parallel_wrap, run), X)
+    pool.map(partial(parallel_wrap, run), X)
     pool.close()
     pool.join()

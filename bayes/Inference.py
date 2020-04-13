@@ -5,7 +5,6 @@ import GPy
 import gadma
 import moments
 import numpy as np
-from GPyOpt.methods import BayesianOptimization
 
 from EvalLogger import EvalLogger
 
@@ -91,13 +90,17 @@ def check_to_stop(bo, iter_cnt, Y_eps):
     return True
 
 
+def optimize_my_bayes(*args, **kwargs):
+    return optimize_bayes(*args, **kwargs)
+
+
 def optimize_bayes(data, model_func,
                    lower_bound, upper_bound, p_ids=None,
                    log=True,
                    max_iter=100,
                    num_init_pts=5,
                    kern_func_name='Matern52',
-                   output_log_file=None):
+                   output_log_file=None, my=False):
     """
     (using GA doc)
     Find optimized params to fit model to data using Bayesian Optimization.
@@ -158,6 +161,11 @@ def optimize_bayes(data, model_func,
     if output_log_file:
         obj_func = partial(eval_log.log_wrapped, obj_func)
 
+    if my:
+        from MyGPyOpt.methods import BayesianOptimization
+    else:
+        from GPyOpt.methods import BayesianOptimization
+
     bo = BayesianOptimization(f=obj_func,
                               domain=domain,
                               model_type='GP',
@@ -165,7 +173,8 @@ def optimize_bayes(data, model_func,
                               kernel=kernel(input_dim=len(p_ids), ARD=True),
                               # By default, in kernel there's only one lengthscale:
                               # separate lengthscales for each dimension can be enables by setting ARD=True
-                              X=p0
+                              X=p0,
+                              # Y=np.array([[obj_func([x]) for x in p0]])
                               )
 
     bo.run_optimization(max_iter=max_iter, verbosity=True)
