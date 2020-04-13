@@ -8,9 +8,10 @@ class Updater:
         self.model_func_name = 'model_func'
         self.dem_model = None  # init in check_model
 
-    def __append_new_code(self, var_name, var_context):
+    def append_new_code(self, var_name, var_context, num_newline=1):
         with open(self.filename, 'a') as f:
-            f.write(f'\n\n{var_name} = {var_context}\n')
+            margin = '\n' * num_newline
+            f.write(f'{margin}{var_name} = {var_context}\n')
 
     def __append_p_ids(self):
         # Основано на предположении о том, что параметры распаковываются в 1й строке
@@ -19,7 +20,7 @@ class Updater:
         # 0 because getsourcelines "Return a list of source lines and starting line number for an object"
         first_string = getsourcelines(self.dem_model.__getattribute__(self.model_func_name))[0][1]
         p_ids = [x.lower()[0] for x in first_string.split()[:-2]]
-        self.__append_new_code('p_ids', p_ids)
+        self.append_new_code('p_ids', p_ids, num_newline=2)
 
     DEFAULT_BDS = {
         'n': [1e-2, 100],
@@ -30,7 +31,7 @@ class Updater:
 
     def __append_bounds(self, bound_type):
         bound = [self.DEFAULT_BDS[p][bound_type == 'upper'] for p in self.dem_model.p_ids]
-        self.__append_new_code(bound_type + '_bound', bound)
+        self.append_new_code(bound_type + '_bound', bound)
 
     def check_model(self, sim_file):
         # TODO: add try except import wrapper
@@ -54,7 +55,7 @@ class Updater:
 
         if 'max_possible_ll' not in exist_attrs:
             sim_mod = importlib.import_module(sim_file.replace('/', '.').rstrip('.py'))
-            self.__append_new_code('max_possible_ll', sim_mod.__getattribute__('ll_model'))
+            self.append_new_code('max_possible_ll', sim_mod.__getattribute__('ll_model'))
 
         importlib.reload(self.dem_model)
 
