@@ -168,6 +168,7 @@ def optimize_bayes(data, model_func,
 
     bo = BayesianOptimization(f=obj_func,
                               domain=domain,
+                              # cost_withGradients='evaluation_time', TODO https://github.com/SheffieldML/GPyOpt/blob/ab291b9c4955a0fde3176da916f57d9b763f8ef9/GPyOpt/models/gpmodel.py#L108 fails
                               model_type='GP',
                               acquisition_type='EI',
                               kernel=kernel(input_dim=len(p_ids), ARD=True),
@@ -178,5 +179,6 @@ def optimize_bayes(data, model_func,
                               )
 
     bo.run_optimization(max_iter=max_iter, verbosity=True)
+    c = bo.cost
 
     return bo

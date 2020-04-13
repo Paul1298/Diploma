@@ -88,8 +88,8 @@ def run(data_dir, algorithm=None, start_idx=0, start_time=None, output_log_dir='
         dem_model = importlib.import_module(model_file.replace(os.path.sep, '.').rstrip('.py'))
 
         # TODO
-        small_test_iter_num = 32
-        small_num_init_pts = 16
+        small_test_iter_num = 4
+        small_num_init_pts = 2
 
         # Load the no_data
         data = moments.Spectrum.from_file(data_fs_file)
@@ -137,19 +137,19 @@ if __name__ == '__main__':
     # pre_run('data_4_DivMig', start_time)
     # run('data_4_DivMig', 'bayes', 0, start_time)
     # data_dirs = list(filter(lambda x: x.startswith('data'), next(os.walk('.'))[1]))
-    # data_dirs = ['data_2_DivMigr']
-    data_dirs = ['data_4_DivMig']
+    data_dirs = ['data_2_DivMigr']
+    # data_dirs = ['data_4_DivMig']
     [pre_run(d, start_time) for d in data_dirs]
 
     # algos = ['bayes', 'gadma', 'random_search']
-    algos = ['my_bayes', 'bayes']
-    # algos = ['my_bayes']
+    # algos = ['my_bayes', 'bayes']
+    algos = ['bayes']
 
-    num_starts = 4
+    num_starts = 2
 
     X = [(d, a, i, start_time) for d in data_dirs for a in algos for i in range(num_starts)]
 
-    num_processes = 6
+    num_processes = 2
     pool = mp.Pool(num_processes)
     pool.map(partial(parallel_wrap, run), X)
     pool.close()

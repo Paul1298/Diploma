@@ -35,17 +35,13 @@ def draw(data_dir):
     plot_lines = [max_line]
     label_names = ['max_possible_ll']
 
-    max_iter_num = 0
+    min_iter_num = np.inf
 
     dirnames = next(os.walk(last_start_dir))[1]
-
     for algorithm in dirnames:
         lls = []
-        # ll_min = []
-        # ll_max = []
-        # ll_mean = []
         iter_num = 0
-        cur_max_iter_num = 0
+        cur_min_iter_num = np.inf
         avg_iter_num = (0, 0)
 
         for dirpath, _, files in os.walk(os.path.join(last_start_dir,
@@ -64,33 +60,14 @@ def draw(data_dir):
                             cur_max_ll = max(logLL, cur_lls[-1]) if cur_lls else logLL
                             cur_lls.append(cur_max_ll)
 
-                            # if iter_num < len(ll_min):
-                            #     ll_min[iter_num] = min(ll_min[iter_num], cur_max_ll)
-                            # else:
-                            #     ll_min.append(cur_max_ll)
-                            #
-                            # if iter_num < len(ll_max):
-                            #     ll_max[iter_num] = max(ll_max[iter_num], cur_max_ll)
-                            # else:
-                            #     ll_max.append(cur_max_ll)
-                            #
-                            # if iter_num < len(ll_mean):
-                            #     ll_mean[iter_num] = (ll_mean[iter_num][0] + cur_max_ll, ll_mean[iter_num][1] + 1)
-                            # else:
-                            #     ll_mean.append((cur_max_ll, 1))
-
                         lls.append(cur_lls)
-                        cur_max_iter_num = max(cur_max_iter_num, iter_num + 1)
+                        cur_min_iter_num = min(cur_min_iter_num, iter_num + 1)
                         avg_iter_num = (avg_iter_num[0] + iter_num + 1, avg_iter_num[1] + 1)
 
-        # lls = np.array([*itertools.zip_longest(*lls, fillvalue=max_possible_ll)]).T
         lls = np.array([*zip(*lls)]).T
 
-        # ll_mean = [(sm / cnt) for (sm, cnt) in ll_mean]
         ll_mean = lls.mean(axis=0)
 
-        # TODO: repeat(or special values) last iters if iter_num is different
-        # iters = list(range(cur_max_iter_num))
         iters = list(range(lls.shape[1]))
 
         col = color_map[algorithm]
@@ -105,16 +82,13 @@ def draw(data_dir):
 
         plt.fill_between(iters, (ll_mean - ci), (ll_mean + ci), alpha=0.4, color=col)
 
-        # ll_min = lls.min(axis=0)
-        # ll_max = lls.max(axis=0)
-        # plt.fill_between(iters, ll_min, ll_max, alpha=0.1, color=col)
-
-        max_iter_num = max(max_iter_num, cur_max_iter_num)
+        min_iter_num = min(min_iter_num, cur_min_iter_num)
 
     plt.yscale('symlog')
 
-    iters = list(range(max_iter_num))
+    iters = list(range(min_iter_num))
     plt.xticks(iters)
+    plt.xlim(xmax=min_iter_num)
 
     plt.yticks(list(filter(lambda x: x < max_possible_ll, plt.yticks()[0])) + [int(max_possible_ll)])
     # print(plt.yticks())
@@ -127,6 +101,8 @@ def draw(data_dir):
 
     plt.savefig(os.path.join(last_start_dir, 'Iteration'), bbox_inches='tight')
 
+def draw_iter(d_d):
+    pass
 
 BAR_WIDTH = 0.25
 
@@ -185,11 +161,8 @@ def mean_iter_time(data_dir):
         # lls = np.array([*itertools.zip_longest(*lls, fillvalue=max_possible_ll)]).T
         iter_times = np.array([*zip(*iter_times)]).T
 
-        # ll_mean = [(sm / cnt) for (sm, cnt) in ll_mean]
         iter_time_mean = iter_times.mean(axis=0)
 
-        # TODO: repeat(or special values) last iters if iter_num is different
-        # iters = list(range(cur_max_iter_num))
         iters = np.array(range(iter_times.shape[1]))
 
         col = color_map[algorithm]
@@ -200,10 +173,6 @@ def mean_iter_time(data_dir):
 
         # confidence interval
         ci = 1.96 * np.std(iter_times, axis=0) / np.sqrt(iter_times.shape[0])
-
-        # ll_min = lls.min(axis=0)
-        # ll_max = lls.max(axis=0)
-        # plt.fill_between(iters, ll_min, ll_max, alpha=0.1, color=col)
 
         max_iter_num = max(max_iter_num, cur_max_iter_num)
 
