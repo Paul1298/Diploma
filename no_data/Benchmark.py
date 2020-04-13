@@ -73,7 +73,7 @@ def run(data_dir, algorithm=None, start_idx=0, start_time=None, output_log_dir='
         cur_log_print = partial(log_print, bench_log_path)
         """
         Предполагаем, что данные хранятся так:
-        
+
         data_dir_name
             -'data.fs'
             -'demographic_model.py'
@@ -89,7 +89,7 @@ def run(data_dir, algorithm=None, start_idx=0, start_time=None, output_log_dir='
 
         # TODO
         small_test_iter_num = 4
-        small_num_init_pts = 2
+        small_num_init_pts = 1
 
         # Load the no_data
         data = moments.Spectrum.from_file(data_fs_file)
@@ -107,10 +107,12 @@ def run(data_dir, algorithm=None, start_idx=0, start_time=None, output_log_dir='
             os.makedirs(log_dir, exist_ok=True)
 
             t1 = time.time()
-            optim(data, dem_model.model_func,
-                  dem_model.lower_bound, dem_model.upper_bound, dem_model.p_ids,
-                  small_test_iter_num, small_num_init_pts,
-                  os.path.join(log_dir, 'evaluations.log'))
+            opt = optim(data, dem_model.model_func,
+                        dem_model.lower_bound, dem_model.upper_bound, dem_model.p_ids,
+                        small_test_iter_num, small_num_init_pts,
+                        os.path.join(log_dir, 'evaluations.log'))
+            if 'bayes' in algorithm:
+                opt.plot_convergence(os.path.join(log_dir, 'convergence.png'))
             t2 = time.time()
             cur_log_print(f'\tEvaluation time: {t2 - t1} ({start_idx} for {algorithm})')
         cur_log_print(f'Finish {start_idx} for {algorithm} algorithm')
@@ -137,15 +139,15 @@ if __name__ == '__main__':
     # pre_run('data_4_DivMig', start_time)
     # run('data_4_DivMig', 'bayes', 0, start_time)
     # data_dirs = list(filter(lambda x: x.startswith('data'), next(os.walk('.'))[1]))
-    data_dirs = ['data_2_DivMigr']
-    # data_dirs = ['data_4_DivMig']
+    # data_dirs = ['data_2_DivMigr']
+    data_dirs = ['data_4_DivNoMig']
     [pre_run(d, start_time) for d in data_dirs]
 
     # algos = ['bayes', 'gadma', 'random_search']
-    # algos = ['my_bayes', 'bayes']
-    algos = ['bayes']
+    algos = ['my_bayes', 'bayes']
+    # algos = ['my_bayes']
 
-    num_starts = 2
+    num_starts = 1
 
     X = [(d, a, i, start_time) for d in data_dirs for a in algos for i in range(num_starts)]
 

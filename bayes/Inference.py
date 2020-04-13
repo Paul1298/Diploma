@@ -1,4 +1,5 @@
 import operator as op
+import os
 from functools import partial
 
 import GPy
@@ -6,6 +7,7 @@ import gadma
 import moments
 import numpy as np
 
+from DemModelUpdater import Updater
 from EvalLogger import EvalLogger
 
 
@@ -90,8 +92,11 @@ def check_to_stop(bo, iter_cnt, Y_eps):
     return True
 
 
-def optimize_my_bayes(*args, **kwargs):
-    return optimize_bayes(*args, **kwargs)
+def write_param_conf(output_log_file, *args):
+    param_file = os.path.join(os.path.dirname(output_log_file), 'params.conf')
+    upd = Updater(param_file)
+    [upd.append_new_code(name, val, num_newline=int(name != 'p_ids')) for name, val in
+     zip('p_ids, lower_bound, upper_bound, num_init_pts, max_iter'.split(', '), args)]
 
 
 def optimize_bayes(data, model_func,
@@ -131,6 +136,7 @@ def optimize_bayes(data, model_func,
     """
     # TODO: check input params (maybe in GADMA)
 
+    write_param_conf(output_log_file, lower_bound, upper_bound, p_ids, max_iter, num_init_pts)
     if output_log_file:
         eval_log: EvalLogger = EvalLogger(output_log_file, log)
 
