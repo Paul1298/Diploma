@@ -15,15 +15,18 @@ from DemModelUpdater import Updater
 SKIP_DIRS = ['__pycache__']
 
 KNOWN_ALGORITHMS = {
+    'spec_not_always': lambda *args, **kwargs: KNOWN_ALGORITHMS['my_bayes'](*args, **kwargs,
+                                                                            spec_anchors_always=False),
+
     'my_bayes': lambda *args, **kwargs: KNOWN_ALGORITHMS['bayes'](*args, **kwargs, my=True),
 
-    'bayes': lambda data, func, lower_bound, upper_bound, p_ids, iter_num, num_init_pts, filename, my=False:
+    'bayes': lambda data, func, lower_bound, upper_bound, p_ids, iter_num, num_init_pts, filename, **kwargs:
     Inference.optimize_bayes(data, func,
                              lower_bound, upper_bound, p_ids,
                              max_iter=iter_num,
                              num_init_pts=num_init_pts,
                              output_log_file=filename,
-                             my=my),
+                             **kwargs),
 
     'gadma': lambda data, func, lower_bound, upper_bound, p_ids, iter_num, num_init_pts, filename:
     gadma.Inference.optimize_ga(len(p_ids), data, func,
@@ -63,8 +66,9 @@ def log_print(bench_log_path, context):
 
 
 def run(data_dir, algorithm=None, start_idx=0, start_time=None, output_log_dir='results'):
-    for dirpath, _, files in os.walk(data_dir):
+    for dirpath, dirs, files in os.walk(data_dir):
         if any(x in dirpath for x in SKIP_DIRS + [output_log_dir]):
+            dirs[:] = []
             continue
 
         result_dir = os.path.join(dirpath, output_log_dir, start_time)
@@ -88,14 +92,13 @@ def run(data_dir, algorithm=None, start_idx=0, start_time=None, output_log_dir='
         dem_model = importlib.import_module(model_file.replace(os.path.sep, '.').rstrip('.py'))
 
         # TODO
-        small_test_iter_num = 4
-        small_num_init_pts = 1
+        small_test_iter_num = 256
+        small_num_init_pts = 16
 
         # Load the no_data
         data = moments.Spectrum.from_file(data_fs_file)
 
         # TODO: do it only when is output_log_dir a subdirectory of data_dir
-
         cur_log_print(f'Start {start_idx} for {algorithm} algorithm')
 
         optim = KNOWN_ALGORITHMS.get(algorithm)
@@ -105,6 +108,8 @@ def run(data_dir, algorithm=None, start_idx=0, start_time=None, output_log_dir='
             algorithm_dir = os.path.join(result_dir, algorithm)
             log_dir = os.path.join(algorithm_dir, f'start{start_idx}')
             os.makedirs(log_dir, exist_ok=True)
+            std_path = os.path.join(log_dir, 'stdout.log')
+            sys.stdout = open(std_path, 'w')
 
             t1 = time.time()
             opt = optim(data, dem_model.model_func,
@@ -119,8 +124,9 @@ def run(data_dir, algorithm=None, start_idx=0, start_time=None, output_log_dir='
 
 
 def pre_run(data_dir, start_time, output_log_dir='results'):
-    for dirpath, _, files in os.walk(data_dir):
+    for dirpath, dirs, files in os.walk(data_dir):
         if any(x in dirpath for x in SKIP_DIRS + [output_log_dir]):
+            dirs[:] = []
             continue
 
         data_fs_file, model_file, sim_file = map(lambda x: os.path.join(dirpath, x), sorted(files))
@@ -134,10 +140,22 @@ def pre_run(data_dir, start_time, output_log_dir='results'):
         Updater(model_file).check_model(sim_file)
 
 
+# def update_data_structure(data_dir, output_log_dir='results'):
+#     result_dir = os.path.join(data_dir, output_log_dir)
+#     for dirpath, dirs, files in os.walk(result_dir):
+#         if dirpath[-1] == ']':
+#             last_dir = dirpath.split('/')[-1]
+#             mo = last_dir[:2]
+#             day = last_dir[3:5]
+#             rest = last_dir[5:]
+#             dst = os.path.join(result_dir, mo, day, rest)
+#             os.makedirs(dst, exist_ok=True)
+#             for f in os.listdir(dirpath):
+#                 move(os.path.join(dirpath, f), dst)
+
 if __name__ == '__main__':
-    start_time = time.strftime('%m.%d[%X]')
-    # pre_run('data_4_DivMig', start_time)
-    # run('data_4_DivMig', 'bayes', 0, start_time)
+    # TODO replace with os delim
+    start_time = time.strftime('%m/%d/[%X]')
     # data_dirs = list(filter(lambda x: x.startswith('data'), next(os.walk('.'))[1]))
     # data_dirs = ['data_2_DivMigr']
     data_dirs = ['data_4_DivNoMig']
@@ -145,13 +163,13 @@ if __name__ == '__main__':
 
     # algos = ['bayes', 'gadma', 'random_search']
     algos = ['my_bayes', 'bayes']
-    # algos = ['my_bayes']
+    # algos = ['spec_not_always']
 
-    num_starts = 1
+    num_starts = 32
 
     X = [(d, a, i, start_time) for d in data_dirs for a in algos for i in range(num_starts)]
 
-    num_processes = 2
+    num_processes = 6
     pool = mp.Pool(num_processes)
     pool.map(partial(parallel_wrap, run), X)
     pool.close()

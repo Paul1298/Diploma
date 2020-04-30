@@ -93,19 +93,19 @@ def check_to_stop(bo, iter_cnt, Y_eps):
 
 
 def write_param_conf(output_log_file, *args):
-    param_file = os.path.join(os.path.dirname(output_log_file), 'params.conf')
+    param_file = os.path.join(os.path.dirname(output_log_file), 'params.py')
     upd = Updater(param_file)
     [upd.append_new_code(name, val, num_newline=int(name != 'p_ids')) for name, val in
-     zip('p_ids, lower_bound, upper_bound, num_init_pts, max_iter'.split(', '), args)]
+     zip('p_ids, lower_bound, upper_bound, num_init_pts, iter_num'.split(', '), args)]
 
 
 def optimize_bayes(data, model_func,
                    lower_bound, upper_bound, p_ids=None,
                    log=True,
                    max_iter=100,
-                   num_init_pts=5,
+                   p0=None, num_init_pts=5,
                    kern_func_name='Matern52',
-                   output_log_file=None, my=False):
+                   output_log_file=None, my=False, **kwargs):
     """
     (using GA doc)
     Find optimized params to fit model to data using Bayesian Optimization.
@@ -122,6 +122,7 @@ def optimize_bayes(data, model_func,
 
     :param log: If log = True, then model_func will be calculated for the logs of the parameters.
     :param max_iter: Maximum iterations to run for.
+    :param p0: Initial parameters.
     :param num_init_pts: Number of initial points.
     :param kern_func_name: Name of the kernel that available at
                            https://github.com/SheffieldML/GPy/blob/devel/GPy/kern/src/stationary.py
@@ -132,11 +133,13 @@ def optimize_bayes(data, model_func,
                         if m[1].__module__ == 'GPy.kern.src.stationary']
                         ```
     :param output_log_file: Stream verbose log output into this filename. If None, no logging.
+    :param my: If my = True, then use my GPyOpt version.
     :return:
     """
     # TODO: check input params (maybe in GADMA)
-
-    write_param_conf(output_log_file, lower_bound, upper_bound, p_ids, max_iter, num_init_pts)
+    if p0 is not None:
+        num_init_pts = len(p0)
+    write_param_conf(output_log_file, p_ids, lower_bound, upper_bound, num_init_pts, max_iter)
     if output_log_file:
         eval_log: EvalLogger = EvalLogger(output_log_file, log)
 
@@ -150,10 +153,11 @@ def optimize_bayes(data, model_func,
     else:
         p_ids = [None for _ in range(len(lower_bound))]
 
-    p0 = np.array(
-        [[generate_random_value(low_bound, upp_bound, p_id) for (low_bound, upp_bound, p_id)
-          in zip(lower_bound, upper_bound, p_ids)]
-         for _ in range(num_init_pts)])
+    if p0 is None:
+        p0 = np.array(
+            [[generate_random_value(low_bound, upp_bound, p_id) for (low_bound, upp_bound, p_id)
+              in zip(lower_bound, upper_bound, p_ids)]
+             for _ in range(num_init_pts)])
 
     if log:
         shift = 1e-15
@@ -182,9 +186,18 @@ def optimize_bayes(data, model_func,
                               # separate lengthscales for each dimension can be enables by setting ARD=True
                               X=p0,
                               # Y=np.array([[obj_func([x]) for x in p0]])
+                              **kwargs
                               )
 
     bo.run_optimization(max_iter=max_iter, verbosity=True)
-    c = bo.cost
+    # first_steps = min(50, max_iter)
+    # bo.run_optimization(max_iter=first_steps, verbosity=True)
+    # rest = max_iter - first_steps
+    # if rest > 0:
+    #     bo.acquisition_type = 'MPI'
+    #     bo.acquisition = bo._acquisition_chooser()
+    #     print('change to MPI')
+    #     bo.run_optimization(max_iter=rest, verbosity=True)
+    # c = bo.cost
 
     return bo
