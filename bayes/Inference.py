@@ -105,7 +105,7 @@ def optimize_bayes(data, model_func,
                    max_iter=100,
                    p0=None, num_init_pts=5,
                    kern_func_name='Matern52',
-                   output_log_file=None, my=False, **kwargs):
+                   output_log_file=None, my=False, acqu_type='MPI', **kwargs):
     """
     (using GA doc)
     Find optimized params to fit model to data using Bayesian Optimization.
@@ -180,10 +180,11 @@ def optimize_bayes(data, model_func,
                               domain=domain,
                               # cost_withGradients='evaluation_time', TODO https://github.com/SheffieldML/GPyOpt/blob/ab291b9c4955a0fde3176da916f57d9b763f8ef9/GPyOpt/models/gpmodel.py#L108 fails
                               model_type='GP',
-                              acquisition_type='EI',
+                              acquisition_type=acqu_type,
                               kernel=kernel(input_dim=len(p_ids), ARD=True),
                               # By default, in kernel there's only one lengthscale:
                               # separate lengthscales for each dimension can be enables by setting ARD=True
+                              noise_var=0,
                               X=p0,
                               # Y=np.array([[obj_func([x]) for x in p0]])
                               **kwargs
