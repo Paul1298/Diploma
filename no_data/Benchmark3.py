@@ -237,7 +237,7 @@ if __name__ == '__main__':
     # data_dirs = ['4_YRI_CEU_CHB_JPT_17_Jou']
     [pre_run(d, start_time) for d in data_dirs]
 
-    algos = ['my_bayes(MPI)']
+    algos = ['random_search']
     # algos = ['my_bayes(MPI)', 'my_bayes(EI)', 'bayes', 'bayes(EI)']
     # algos = ['gadma', 'random_search']
 
@@ -247,7 +247,7 @@ if __name__ == '__main__':
     num_init_pts = 10
 
     # res = get_init(data_dirs[0], '04/23/[23:49:38]', 40, base_algo='my_bayes(MPI)')
-    res = get_init(data_dirs[0], '05/28/[01:57:54]', 10, base_algo='gadma')
+    # res = get_init(data_dirs[0], '05/28/[01:57:54]', 10, base_algo='gadma')
 
     # starts_arr = range(num_starts)
     # calced = get_calced(data_dirs[0], start_time, algos[0])
@@ -267,8 +267,8 @@ if __name__ == '__main__':
     # X = [(d, a, i, start_time, p0s[(d, i)], ll0s[(d, i)]) for d in data_dirs for a in algos for i in range(num_starts)]
 
     # # print(starts_arr)
-    X = [(d, a, i, start_time, res[(d, i)][0], res[(d, i)][1]) for d in data_dirs for a in algos for i in starts_arr]
-    # X = [(d, a, i, start_time) for d in data_dirs for a in algos for i in starts_arr]
+    # X = [(d, a, i, start_time, res[(d, i)][0], res[(d, i)][1]) for d in data_dirs for a in algos for i in starts_arr]
+    X = [(d, a, i, start_time) for d in data_dirs for a in algos for i in starts_arr]
     kwargs = {'iter_num': iter_num, 'num_init_pts': num_init_pts}
 
     pool.map(partial(parallel_wrap, partial(run, **kwargs)), X)

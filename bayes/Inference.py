@@ -7,6 +7,7 @@ import gadma
 import moments
 import numpy as np
 
+# import PopKern
 from DemModelUpdater import Updater
 from EvalLogger import EvalLogger
 
@@ -103,7 +104,7 @@ def optimize_bayes(data, model_func,
                    lower_bound, upper_bound, p_ids=None,
                    log=True,
                    max_iter=100,
-                   p0=None, num_init_pts=5,
+                   p0=None, ll0=None, num_init_pts=1,
                    kern_func_name='Matern52',
                    output_log_file=None, my=False, acqu_type='MPI', **kwargs):
     """
@@ -123,6 +124,7 @@ def optimize_bayes(data, model_func,
     :param log: If log = True, then model_func will be calculated for the logs of the parameters.
     :param max_iter: Maximum iterations to run for.
     :param p0: Initial parameters.
+    :param ll0: Func value in p0
     :param num_init_pts: Number of initial points.
     :param kern_func_name: Name of the kernel that available at
                            https://github.com/SheffieldML/GPy/blob/devel/GPy/kern/src/stationary.py
@@ -146,7 +148,11 @@ def optimize_bayes(data, model_func,
     ns = data.sample_sizes
     domain = np.array([{'name': 'var_' + str(i), 'type': 'continuous', 'domain': bd}
                        for i, bd in enumerate(zip(lower_bound, upper_bound))])
-    kernel = op.attrgetter(kern_func_name)(GPy.kern.src.stationary)
+    kernel = op.attrgetter(kern_func_name)(GPy.kern.src.stationary)(input_dim=len(p_ids), ARD=True)
+    # kernel = op.attrgetter(kern_func_name)(PopKern)(input_dim=len(p_ids),
+    #                                                 ARD=True)  # , lengthscale = [2, 2, 2, 2, 2, 2, 0.5, 0.5, 0.5])
+    # rbf = GPy.kern.RBF(input_dim=len(p_ids), ARD=True)
+    # kernel = GPy.kern.Add((kernel, rbf))
 
     if p_ids is not None:
         p_ids = [x.lower()[0] for x in p_ids]
@@ -171,6 +177,10 @@ def optimize_bayes(data, model_func,
     if output_log_file:
         obj_func = partial(eval_log.log_wrapped, obj_func)
 
+    if ll0 is not None:
+        eval_log.write_calculated_values(p0, ll0)
+        ll0 = np.array([ll0]).T
+
     if my:
         from MyGPyOpt.methods import BayesianOptimization
     else:
@@ -181,16 +191,19 @@ def optimize_bayes(data, model_func,
                               # cost_withGradients='evaluation_time', TODO https://github.com/SheffieldML/GPyOpt/blob/ab291b9c4955a0fde3176da916f57d9b763f8ef9/GPyOpt/models/gpmodel.py#L108 fails
                               model_type='GP',
                               acquisition_type=acqu_type,
-                              kernel=kernel(input_dim=len(p_ids), ARD=True),
+                              kernel=kernel,
                               # By default, in kernel there's only one lengthscale:
                               # separate lengthscales for each dimension can be enables by setting ARD=True
                               noise_var=0,
                               X=p0,
+                              Y=ll0,
                               # Y=np.array([[obj_func([x]) for x in p0]])
                               **kwargs
                               )
 
-    bo.run_optimization(max_iter=max_iter, verbosity=True)
+    bo.run_optimization(max_iter=max_iter-num_init_pts
+                        # , verbosity=True
+                        )
     # first_steps = min(50, max_iter)
     # bo.run_optimization(max_iter=first_steps, verbosity=True)
     # rest = max_iter - first_steps
