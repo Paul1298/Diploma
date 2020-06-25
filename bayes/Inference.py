@@ -69,8 +69,7 @@ def objective_func(model_func, data, ns, log, parameters_set):
     """
     lls = []
     for parameters in parameters_set:
-        if log:
-            parameters = np.exp(parameters)
+        parameters = np.array([np.exp(parameters.T[i]) if l else parameters.T[i] for i, l in enumerate(log)]).T
 
         model = model_func(parameters, ns)
 
@@ -106,7 +105,7 @@ def optimize_bayes(data, model_func,
                    max_iter=100,
                    p0=None, ll0=None, num_init_pts=1,
                    kern_func_name='Matern52',
-                   output_log_file=None, my=False, acqu_type='MPI', **kwargs):
+                   output_log_file=None, my=False, acqu_type='MPI', mig_no_log=False, **kwargs):
     """
     (using GA doc)
     Find optimized params to fit model to data using Bayesian Optimization.
@@ -142,13 +141,12 @@ def optimize_bayes(data, model_func,
     if p0 is not None:
         num_init_pts = len(p0)
     write_param_conf(output_log_file, p_ids, lower_bound, upper_bound, num_init_pts, max_iter)
-    if output_log_file:
-        eval_log: EvalLogger = EvalLogger(output_log_file, log)
 
     ns = data.sample_sizes
     domain = np.array([{'name': 'var_' + str(i), 'type': 'continuous', 'domain': bd}
                        for i, bd in enumerate(zip(lower_bound, upper_bound))])
     kernel = op.attrgetter(kern_func_name)(GPy.kern.src.stationary)(input_dim=len(p_ids), ARD=True)
+    # GPy.kern.RBF(active_dims=)
     # kernel = op.attrgetter(kern_func_name)(PopKern)(input_dim=len(p_ids),
     #                                                 ARD=True)  # , lengthscale = [2, 2, 2, 2, 2, 2, 0.5, 0.5, 0.5])
     # rbf = GPy.kern.RBF(input_dim=len(p_ids), ARD=True)
@@ -166,12 +164,25 @@ def optimize_bayes(data, model_func,
              for _ in range(num_init_pts)])
 
     if log:
+        p0 = p0.T
         shift = 1e-15
         shift_zero = lambda x: shift if x <= 0 else x
-        for d in domain:
-            dom = [shift_zero(bd) for bd in d['domain']]
-            d.update({'domain': np.log(dom)})
-        p0 = np.log(p0)
+        res = []
+        logs = []
+        for i, (p_id, d) in enumerate(zip(p_ids, domain)):
+            if mig_no_log and p_id == 'm':
+                res.append(p0[i])
+                logs.append(False)
+            else:
+                dom = [shift_zero(bd) for bd in d['domain']]
+                d.update({'domain': np.log(dom)})
+                res.append(np.log(p0[i]))
+                logs.append(True)
+        p0 = np.array(res).T
+    log = logs
+
+    if output_log_file:
+        eval_log: EvalLogger = EvalLogger(output_log_file, log)
 
     obj_func = partial(objective_func, model_func, data, ns, log)
     if output_log_file:
@@ -201,8 +212,8 @@ def optimize_bayes(data, model_func,
                               **kwargs
                               )
 
-    bo.run_optimization(max_iter=max_iter-num_init_pts
-                        # , verbosity=True
+    bo.run_optimization(max_iter=max_iter - num_init_pts
+                        , verbosity=True
                         )
     # first_steps = min(50, max_iter)
     # bo.run_optimization(max_iter=first_steps, verbosity=True)

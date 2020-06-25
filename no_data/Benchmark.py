@@ -1,5 +1,4 @@
 import importlib
-import multiprocessing as mp
 import os
 import sys
 import time
@@ -16,10 +15,11 @@ from DemModelUpdater import Updater
 SKIP_DIRS = ['__pycache__']
 
 KNOWN_ALGORITHMS = {
+    'mig_no_log': lambda *args, **kwargs: KNOWN_ALGORITHMS['my_bayes(MPI)'](*args, **kwargs, mig_no_log=True),
     'my_bayes(EI)': lambda *args, **kwargs: KNOWN_ALGORITHMS['my_bayes(MPI)'](*args, **kwargs, acqu_type='EI'),
     'bayes(EI)': lambda *args, **kwargs: KNOWN_ALGORITHMS['bayes'](*args, **kwargs, acqu_type='EI'),
-    'spec_not_always': lambda *args, **kwargs: KNOWN_ALGORITHMS['my_bayes(MPI)'](*args, **kwargs,
-                                                                            spec_anchors_always=False),
+    # 'spec_not_always': lambda *args, **kwargs: KNOWN_ALGORITHMS['my_bayes'](*args, **kwargs,
+    #                                                                         spec_anchors_always=False),
 
     'my_bayes(MPI)': lambda *args, **kwargs: KNOWN_ALGORITHMS['bayes'](*args, **kwargs, my=True),
 
@@ -75,28 +75,28 @@ def log_print(bench_log_path, context):
         print(time.strftime('[%X]') + context, file=log_file)
 
 
-def generate_p0(data_dir, num_init_pts):
-    for dirpath, dirs, files in os.walk(data_dir):
-        if any(x in dirpath for x in SKIP_DIRS + ['results']):
-            dirs[:] = []
-            continue
-        data_fs_file, model_file, _ = map(lambda x: os.path.join(dirpath, x), sorted(files))
-        dem_model = importlib.import_module(model_file.replace(os.path.sep, '.').rstrip('.py'))
-
-        p0 = np.array(
-            [[Inference.generate_random_value(low_bound, upp_bound, p_id) for (low_bound, upp_bound, p_id)
-              in zip(dem_model.lower_bound, dem_model.upper_bound, dem_model.p_ids)]
-             for _ in range(num_init_pts)])
-
-        data = moments.Spectrum.from_file(data_fs_file)
-        ns = data.sample_sizes
-        log = True
-
-        # TODO with open(self.log_file, 'w') as log_file:
-        obj_func = partial(Inference.objective_func, dem_model.model_func, data, ns, log)
-
-        ll0 = obj_func(p0)
-        return p0, ll0
+# def generate_p0(data_dir, num_init_pts):
+#     for dirpath, dirs, files in os.walk(data_dir):
+#         if any(x in dirpath for x in SKIP_DIRS + ['results']):
+#             dirs[:] = []
+#             continue
+#         data_fs_file, model_file, _ = map(lambda x: os.path.join(dirpath, x), sorted(files))
+#         dem_model = importlib.import_module(model_file.replace(os.path.sep, '.').rstrip('.py'))
+#
+#         p0 = np.array(
+#             [[Inference.generate_random_value(low_bound, upp_bound, p_id) for (low_bound, upp_bound, p_id)
+#               in zip(dem_model.lower_bound, dem_model.upper_bound, dem_model.p_ids)]
+#              for _ in range(num_init_pts)])
+#
+#         data = moments.Spectrum.from_file(data_fs_file)
+#         ns = data.sample_sizes
+#         log = True
+#
+#         # TODO with open(self.log_file, 'w') as log_file:
+#         obj_func = partial(Inference.objective_func, dem_model.model_func, data, ns, log)
+#
+#         ll0 = obj_func(p0)
+#         return p0, ll0
 
 
 def run(data_dir, algorithm=None, start_idx=0, start_time=None, p0=None, ll0=None, iter_num=50, num_init_pts=16,
@@ -226,51 +226,91 @@ def get_calced(data_dir, start_time, algo, output_log_dir='results'):
     return res
 
 
+def copy_values(data_dir, src_dir, dst_dir, num_init_pts, replace=False):
+    src_dir = os.path.join(data_dir, 'results', src_dir)
+    dst_dir = os.path.join(data_dir, 'results', dst_dir)
+
+    for dirpath, dirnames, files in os.walk(src_dir):
+        last_dir = dirpath.split('/')[-1]
+        start_word = 'start'
+        if last_dir.startswith(start_word):
+            cur_start = int(last_dir[len(start_word):])
+            for f in files:
+                if f == 'evaluations.log':
+                    src_log_file = os.path.join(src_dir, start_word + str(cur_start), f)
+                    dst_log_file = os.path.join(dst_dir, start_word + str(cur_start), f)
+
+                    prepend_calculated_values(num_init_pts, src_log_file, dst_log_file, replace)
+                    print(f'copied from {src_log_file} to {dst_log_file}')
+
+
+def prepend_calculated_values(num_init_pts, src_file, dst_file, replace):
+    old_values = []
+    with open(src_file, 'r') as of:
+        next(of)
+
+        for iter_num, line in enumerate(of):
+            old_values.append(line)
+            if iter_num + 1 == num_init_pts:
+                break
+
+    with open(dst_file, 'r') as nf:
+        list_of_lines = nf.readlines()
+    list_of_lines[1:(num_init_pts + 1 if replace else 1)] = old_values
+
+    with open(dst_file, 'w') as nf:
+        nf.writelines(list_of_lines)
+
+
 if __name__ == '__main__':
-    # TODO replace with os delim
-    # start_time = time.strftime('%m/%d/[%X]')
-    # start_time = '04/23/[23:49:38](BOGA)'
-    start_time = '05/28/[01:57:54]'
-    # data_dirs = list(filter(lambda x: x.startswith('data'), next(os.walk('.'))[1]))
-    # data_dirs = ['data_4_DivNoMig']
-    data_dirs = ['4_real_NoMig']
-    # data_dirs = ['4_YRI_CEU_CHB_JPT_17_Jou']
-    [pre_run(d, start_time) for d in data_dirs]
+    copy_values('data_4_DivNoMig', '05/09/[01:23:25]/my_bayes(NOise, 5anchors)', '04/23/[23:49:38]/BO+GA', 40,
+                replace=True)
 
-    algos = ['my_bayes(MPI)']
-    # algos = ['my_bayes(MPI)', 'my_bayes(EI)', 'bayes', 'bayes(EI)']
-    # algos = ['gadma', 'random_search']
-
-    num_starts = 16
-
-    iter_num = 200
-    num_init_pts = 10
-
-    # res = get_init(data_dirs[0], '04/23/[23:49:38]', 40, base_algo='my_bayes(MPI)')
-    res = get_init(data_dirs[0], '05/28/[01:57:54]', 10, base_algo='gadma')
-
-    # starts_arr = range(num_starts)
-    # calced = get_calced(data_dirs[0], start_time, algos[0])
-    # starts_arr = list(set(x[1] for x in res.keys()) - set(calced))[:num_starts]
-    starts_arr = list(range(4, 20))
-    print(start_time, data_dirs, algos, starts_arr)
-
-    num_processes = 8
-    pool = mp.Pool(num_processes)
-
-    # res = pool.map(partial(parallel_wrap, generate_p0),
-    #                [(d, small_num_init_pts) for d in data_dirs for i in range(num_starts)])
-    # pairs = [(d, i) for d in data_dirs for i in range(num_starts)]
-    # p0s = dict(zip(pairs, [x[0] for x in res]))
-    # ll0s = dict(zip(pairs, [x[1] for x in res]))
-
-    # X = [(d, a, i, start_time, p0s[(d, i)], ll0s[(d, i)]) for d in data_dirs for a in algos for i in range(num_starts)]
-
-    # # print(starts_arr)
-    X = [(d, a, i, start_time, res[(d, i)][0], res[(d, i)][1]) for d in data_dirs for a in algos for i in starts_arr]
-    # X = [(d, a, i, start_time) for d in data_dirs for a in algos for i in starts_arr]
-    kwargs = {'iter_num': iter_num, 'num_init_pts': num_init_pts}
-
-    pool.map(partial(parallel_wrap, partial(run, **kwargs)), X)
-    pool.close()
-    pool.join()
+# if __name__ == '__main__':
+#     # TODO replace with os delim
+#     # start_time = time.strftime('%m/%d/[%X]')
+#     start_time = '05/30/[14:54:30](BO+GA)[100]'
+#     # data_dirs = list(filter(lambda x: x.startswith('data'), next(os.walk('.'))[1]))
+#     data_dirs = ['data_5_DivNoMig']
+#     # data_dirs = ['3_YRI_CEU_CHB_13_Jou']
+#     # data_dirs = ['4_YRI_CEU_CHB_JPT_17_Jou']
+#     [pre_run(d, start_time) for d in data_dirs]
+#
+#     algos = ['gadma']
+#     # algos = [mig_no_log, 'my_bayes(MPI)', 'my_bayes(EI)', 'bayes', 'bayes(EI)']
+#     # algos = ['gadma', 'random_search']
+#
+#     # num_starts = 4
+#
+#     iter_num = 250
+#     num_init_pts = 100
+#
+#     res = get_init(data_dirs[0], '05/30/[14:54:30]', num_init_pts, base_algo='my_bayes(MPI)')
+#     # res = get_init(data_dirs[0], '05/24/[02:21:31]', 30, base_algo='my_bayes(MPI)')
+#     # res = get_init(data_dirs[0], start_time, num_init_pts, base_algo='gadma')
+#
+#     # starts_arr = range(num_starts)
+#     # calced = get_calced(data_dirs[0], start_time, algos[0])
+#     # starts_arr = list(set(x[1] for x in res.keys()) - set(calced))[:num_starts]
+#     starts_arr = list(range(0, 2))
+#     print(start_time, data_dirs, algos, starts_arr)
+#
+#     num_processes = 2
+#     pool = mp.Pool(num_processes)
+#
+#     # res = pool.map(partial(parallel_wrap, generate_p0),
+#     #                [(d, small_num_init_pts) for d in data_dirs for i in range(num_starts)])
+#     # pairs = [(d, i) for d in data_dirs for i in range(num_starts)]
+#     # p0s = dict(zip(pairs, [x[0] for x in res]))
+#     # ll0s = dict(zip(pairs, [x[1] for x in res]))
+#
+#     # X = [(d, a, i, start_time, p0s[(d, i)], ll0s[(d, i)]) for d in data_dirs for a in algos for i in range(num_starts)]
+#
+#     # # print(starts_arr)
+#     X = [(d, a, i, start_time, res[(d, i)][0], res[(d, i)][1]) for d in data_dirs for a in algos for i in starts_arr]
+#     # X = [(d, a, i, start_time) for d in data_dirs for a in algos for i in starts_arr]
+#     kwargs = {'iter_num': iter_num, 'num_init_pts': num_init_pts}
+#
+#     pool.map(partial(parallel_wrap, partial(run, **kwargs)), X)
+#     pool.close()
+#     pool.join()
